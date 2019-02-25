@@ -35,7 +35,7 @@ for x1 in range(0,3):
     for x2 in range(0,3):
         for x3 in range(0,2):
             for x4 in range(0,2):
-                testData.append([x1,x2,x3,x4,x5])
+                testData.append([x1,x2,x3,x4])
 
 # From random-forest/tutorial: Decision tree from scratch
 def class_counts(rows):
@@ -77,7 +77,7 @@ class Question:
 # This builds the tree recursively
 # Adapted from random-forest/tutorial: Decision tree from scratch
 def buildTree(rows):
-    info, question = findBestSplit(targetCategories, 0, rows) #the targetIndex is 0 now!
+    info, question = findBestSplit(targetCategories, targetIndex, rows)
     if info == 0 or question == None: return Leaf(rows)
     trueRows, falseRows = getSubsets(rows, question)
     trueBranch = buildTree(trueRows)
@@ -237,25 +237,12 @@ print("running! \n")
 print("Data head:")
 print(data.head())
 
-width = len(data.values[0])
-print("width =",width)
-columns = [targetIndex] # column indices for tree, targetColumn is added first!
-while len(columns) <= width - 2:
-    ri= randint(0,width - 1)
-    if not ri in columns:
-        columns.append(ri)
-
-print("columns =", columns)
-rows = data.values[:,columns]
-print("rows =", rows)
-
 print("\nTree:")
-tree = buildTree(rows)
+tree = buildTree(data.values)
 print_tree(tree)
 
 print("\nPredictions:{label->count}")
 for row in testData:
-    nrow = [row[i] for i in columns[1,:]]
-    print(str(nrow) + "--->" + str(classify(nrow,tree)))    
+    print(str(row) + "--->" + str(classify(row,tree)))    
 
 print("done!")
