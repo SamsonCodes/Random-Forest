@@ -77,7 +77,8 @@ class Question:
 # This builds the tree recursively
 # Adapted from random-forest/tutorial: Decision tree from scratch
 def buildTree(rows):
-    info, question = findBestSplit(targetCategories, targetIndex, rows)
+    targetVariable = len(rows[0]) - 1  
+    info, question = findBestSplit(targetCategories, targetVariable, rows) #targetVariable is last column
     if info == 0 or question == None: return Leaf(rows)
     trueRows, falseRows = getSubsets(rows, question)
     trueBranch = buildTree(trueRows)
@@ -91,7 +92,7 @@ def findBestSplit(targetCategories, targetVariable, rows):
     stepAmount = 10
     for operator in operators:
         for variableIndex in range(0, len(rows[0])):            
-            if not (variableIndex == targetIndex):
+            if not (variableIndex == targetVariable):
                 interval = getInterval(rows, variableIndex)
                 varRange = interval[1] - interval[0]
                 for x in range(0, stepAmount):
@@ -232,17 +233,46 @@ def classify(row, node):
     else:
         return classify(row, node.falseBranch)
 
+def buildforest(rows, n):
+    rows0 = rows
+    forest = []
+    for x in range (0, n):
+        width = len(rows0[0])
+        features = width - 1
+        k = features - 1
+        columns = [targetIndex]
+        while len(columns) < k + 1:
+            ri = randint(0,features-1)
+            if not ri in columns:
+                columns.append(ri)
+        columns.sort()
+        rows = rows0[:,columns]    
+        print("\nTree:")
+        tree = buildTree(rows)
+        print(columns)
+        print_tree(tree)
+        forest.append([tree,columns])
+    return forest
+"""
+def forestclassify(row, forest):
+    votes = []
+    for entry in forest:
+        tree = entry[0]
+        columns = entry[1]
+        row = [row[i] for i in columns]
+        votes.append(classify(row, tree))
+    print(votes)
+"""
 #MAIN PROGRAM
 print("running! \n")
 print("Data head:")
 print(data.head())
 
-print("\nTree:")
-tree = buildTree(data.values)
-print_tree(tree)
-
+forest = buildforest(data.values, 3)
+#forestclassify(data.values[0],forest)
+"""
 print("\nPredictions:{label->count}")
 for row in testData:
     print(str(row) + "--->" + str(classify(row,tree)))    
-
+"""
 print("done!")
