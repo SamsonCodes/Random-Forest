@@ -7,9 +7,11 @@ Created on Wed Feb 25 2019
 @author: Samson
 """
 import pandas as pd
+import numpy as np
 from random import randint
 
 operators = ['==','<','>']
+
 
 #See Word document for encoding
 Golf = [[0,2,1,0,0],
@@ -26,16 +28,29 @@ Golf = [[0,2,1,0,0],
         [1,1,1,1,1],
         [1,2,0,0,1],
         [2,1,1,1,0]]
-data = pd.DataFrame(data = Golf, columns = ["Outlook","Temp","Humidity","Windy","Play"], copy = False)
-targetIndex = 4
-targetCategories = [0,1]
+data1 = pd.DataFrame(data = Golf, columns = ["Outlook","Temp","Humidity","Windy","Play"], copy = False)
+targetIndex1 = 4
+targetCategories1 = [0,1]
 
-testData = []
+testData1 = []
 for x1 in range(0,3):
     for x2 in range(0,3):
         for x3 in range(0,2):
             for x4 in range(0,2):
-                testData.append([x1,x2,x3,x4])
+                    row = [x1,x2,x3,x4]
+                    testData1.append(row)
+             
+# Red wine data
+dataset_url = 'http://mlr.cs.umass.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv'
+data2 = pd.read_csv(dataset_url, sep=';')
+print('loaded data!')
+targetIndex2 = len(data2.values[0]) - 1
+print("targetIndex2 = " + str(targetIndex2))
+targetSet = set(data2.values[:,targetIndex2])
+targetCategories2 = []
+for x in targetSet:
+    targetCategories2.append(int(x))
+print("targetCategories2 = " + str(targetCategories2))
 
 # From random-forest/tutorial: Decision tree from scratch
 def class_counts(rows):
@@ -71,18 +86,19 @@ class Question:
         self.splitValue = splitValue
     # This returns the splitcondition as a question in string format
     def text(self):
-        return (data.columns[self.valueIndex] + ' ' + self.operator 
+        return (self.valueIndex + ' ' + self.operator 
                 + ' ' + str(self.splitValue) + "?")
 
 # This builds the tree recursively
 # Adapted from random-forest/tutorial: Decision tree from scratch
-def buildTree(rows):
+def buildTree(rows, targetCategories,depth):
+    print("#",end='')
     targetVariable = len(rows[0]) - 1  
     info, question = findBestSplit(targetCategories, targetVariable, rows) #targetVariable is last column
-    if info == 0 or question == None: return Leaf(rows)
+    if info == 0 or question == None or depth == 0: return Leaf(rows)
     trueRows, falseRows = getSubsets(rows, question)
-    trueBranch = buildTree(trueRows)
-    falseBranch = buildTree(falseRows)
+    trueBranch = buildTree(trueRows, targetCategories, depth - 1)
+    falseBranch = buildTree(falseRows, targetCategories, depth - 1)
     return Node(question, trueBranch, falseBranch)
 
 # This finds the best split based on the gini index
@@ -136,14 +152,14 @@ def equalTo(a, b):
     return False
 
 # This calculates the gini index for a single set
-def giniIndex(targetCategories, targetVariable, rows):  
+def giniIndex(targetCategories, targetVariable, rows):
     categories = []
     for c in targetCategories:
         categories.append([])
     for row in rows:
         for c in targetCategories:
             if(row[targetVariable] == c):
-                categories[c].append(row)           
+                categories[targetCategories.index(c)].append(row)           
     blob = 0
     for c in range (0, len(categories)):
         blob+=(len(categories[c])/len(rows))**2
@@ -164,7 +180,7 @@ def weightedGini(targetCategories, targetVariable, subsets):
 
 #This calculates the information gain that results from the splitting of a set
 #Based on a certain splitcondition (question)
-def infoGain(targetCategories, targetVariable, rows, question):    
+def infoGain(targetCategories, targetVariable, rows, question): 
     gini1 = giniIndex(targetCategories, targetVariable, rows)
     gini2 = weightedGini(targetCategories, targetVariable, getSubsets(rows, question))
     return (gini1 - gini2)   
@@ -233,28 +249,41 @@ def classify(row, node):
     else:
         return classify(row, node.falseBranch)
 
-def buildforest(rows, n):
+def buildforest(rows, targetCategories, targetIndex, n, depth = 5, maxSetSize = 50):
     rows0 = rows
     forest = []
     for x in range (0, n):
         width = len(rows0[0])
         features = width - 1
-        k = features - 1
+        k = (features/4)*3
         columns = [targetIndex]
         while len(columns) < k + 1:
             ri = randint(0,features-1)
             if not ri in columns:
                 columns.append(ri)
         columns.sort()
-        rows = rows0[:,columns]    
+        rows = rows0[:,columns]
+        trainingSize = min(len(rows0), maxSetSize)
+        if(trainingSize == maxSetSize):
+            trainingrows = []
+            while (len(trainingrows) < trainingSize):
+                ri = randint(0,len(rows0)-1)
+                if not ri in trainingrows:
+                    trainingrows.append(ri)
+            trainingrows.sort()
+            rows = rows[trainingrows,:]
+             
+        tree = buildTree(rows, targetCategories,depth)        
+        print(x+1)
+        """
         print("\nTree:")
-        tree = buildTree(rows)
         print("columns=",columns)
         print_tree(tree)
+        """
         forest.append([tree,columns])
     return forest
 
-def forestclassify(row, forest):
+def forestclassify(row, forest): 
     row0 = row
     votes = []
     for entry in forest:
@@ -263,8 +292,10 @@ def forestclassify(row, forest):
         nrow = [row0[i] for i in columns]
         row = nrow
         votes.append(classify(row, tree))
-    
-    print("Prediction " + str(row0) + " --> " + str(combine_votes(votes)))
+    combined = combine_votes(votes)
+    prediction = winner(combined)
+    print("Prediction " + str(row0[-1]) + " --> " + str(combined) + " --> " + str(prediction))
+    return prediction
         
 def combine_votes(votes):
     """Combines the votes into a single dictionary"""
@@ -275,18 +306,29 @@ def combine_votes(votes):
                 votecounts[key] = 0
             votecounts[key] += vote[key]   
     return votecounts
+
+def winner(vote):
+    maxKey = list(vote.keys())[0]
+    maxValue = vote[maxKey]
+    for key in vote:
+        if vote[key] > maxValue:
+            maxKey = key
+            maxValue = vote[key]
+    return maxKey
+
+def accuracy(forest, testSet):
+    for x in testSet.values:
+        forestclassify(x, forest)
         
 #MAIN PROGRAM
 print("running! \n")
-print("Data head:")
-print(data.head())
+print("Data2 head:")
+print(data2.head())
 
-forest = buildforest(data.values, 20)
-print("\n")
-forestclassify(data.values[0],forest)
-"""
-print("\nPredictions:{label->count}")
-for row in testData:
-    print(str(row) + "--->" + str(classify(row,tree)))    
-"""
+trainingset = data2.loc[0:1499] #Use first 1500 values as the trainingset
+testSet = data2.loc[1500:1599] # Use the last 100 values as the testset
+forest = buildforest(trainingset.values,targetCategories2,targetIndex2, 10) # Build a random forest of 20 trees
+for x in testSet.values:
+    forestclassify(x, forest)
+
 print("done!")
