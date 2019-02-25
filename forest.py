@@ -249,27 +249,41 @@ def buildforest(rows, n):
         rows = rows0[:,columns]    
         print("\nTree:")
         tree = buildTree(rows)
-        print(columns)
+        print("columns=",columns)
         print_tree(tree)
         forest.append([tree,columns])
     return forest
-"""
+
 def forestclassify(row, forest):
+    row0 = row
     votes = []
     for entry in forest:
         tree = entry[0]
         columns = entry[1]
-        row = [row[i] for i in columns]
+        nrow = [row0[i] for i in columns]
+        row = nrow
         votes.append(classify(row, tree))
-    print(votes)
-"""
+    
+    print("Prediction " + str(row0) + " --> " + str(combine_votes(votes)))
+        
+def combine_votes(votes):
+    """Combines the votes into a single dictionary"""
+    votecounts = {}  # a dictionary of label -> count.
+    for vote in votes:
+        for key in vote:
+            if key not in votecounts:
+                votecounts[key] = 0
+            votecounts[key] += vote[key]   
+    return votecounts
+        
 #MAIN PROGRAM
 print("running! \n")
 print("Data head:")
 print(data.head())
 
-forest = buildforest(data.values, 3)
-#forestclassify(data.values[0],forest)
+forest = buildforest(data.values, 20)
+print("\n")
+forestclassify(data.values[0],forest)
 """
 print("\nPredictions:{label->count}")
 for row in testData:
