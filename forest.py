@@ -249,7 +249,7 @@ def classify(row, node):
     else:
         return classify(row, node.falseBranch)
 
-def buildforest(rows, targetCategories, targetIndex, n, depth = 5, maxSetSize = 50):
+def buildforest(rows, targetCategories, targetIndex, n, depth = 10, maxSetSize = 100):
     rows0 = rows
     forest = []
     for x in range (0, n):
@@ -317,8 +317,14 @@ def winner(vote):
     return maxKey
 
 def accuracy(forest, testSet):
+    correct = 0
+    size = len(testSet.values)
     for x in testSet.values:
-        forestclassify(x, forest)
+        prediction = forestclassify(x, forest)
+        if x[-1] == prediction:
+            correct+=1
+    return correct/size
+        
         
 #MAIN PROGRAM
 print("running! \n")
@@ -327,8 +333,8 @@ print(data2.head())
 
 trainingset = data2.loc[0:1499] #Use first 1500 values as the trainingset
 testSet = data2.loc[1500:1599] # Use the last 100 values as the testset
-forest = buildforest(trainingset.values,targetCategories2,targetIndex2, 10) # Build a random forest of 20 trees
-for x in testSet.values:
-    forestclassify(x, forest)
+forest = buildforest(trainingset.values,targetCategories2,targetIndex2, 25) # Build a random forest of 20 trees
+
+print("Accuracy = " + str(round(accuracy(forest,testSet),2)))
 
 print("done!")
