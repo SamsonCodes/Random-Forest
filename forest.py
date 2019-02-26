@@ -9,6 +9,7 @@ Created on Wed Feb 25 2019
 import pandas as pd
 import numpy as np
 from random import randint
+from math import sqrt
 
 operators = ['==','<','>']
 
@@ -51,6 +52,8 @@ targetCategories2 = []
 for x in targetSet:
     targetCategories2.append(int(x))
 print("targetCategories2 = " + str(targetCategories2))
+
+stepAmount = 10 # amount of steps per feature value
 
 # From random-forest/tutorial: Decision tree from scratch
 def class_counts(rows):
@@ -105,7 +108,6 @@ def buildTree(rows, targetCategories,depth):
 def findBestSplit(targetCategories, targetVariable, rows): 
     bestGain = None
     bestQuestion = None
-    stepAmount = 10
     for operator in operators:
         for variableIndex in range(0, len(rows[0])):            
             if not (variableIndex == targetVariable):
@@ -252,6 +254,7 @@ def classify(row, node):
 def buildforest(rows, targetCategories, targetIndex, n, depth = 10, maxSetSize = 100):
     rows0 = rows
     forest = []
+    print("building forest...")
     for x in range (0, n):
         width = len(rows0[0])
         features = width - 1
@@ -274,13 +277,14 @@ def buildforest(rows, targetCategories, targetIndex, n, depth = 10, maxSetSize =
             rows = rows[trainingrows,:]
              
         tree = buildTree(rows, targetCategories,depth)        
-        print(x+1)
+        print(str(x+1) + "/" + str(n))
         """
         print("\nTree:")
         print("columns=",columns)
         print_tree(tree)
         """
         forest.append([tree,columns])
+    print("forest complete!")
     return forest
 
 def forestclassify(row, forest): 
@@ -293,9 +297,8 @@ def forestclassify(row, forest):
         row = nrow
         votes.append(classify(row, tree))
     combined = combine_votes(votes)
-    prediction = winner(combined)
-    print("Prediction " + str(row0[-1]) + " --> " + str(combined) + " --> " + str(prediction))
-    return prediction
+    prediction = winner(combined)    
+    return [combined, prediction, row0[-1] == prediction]
         
 def combine_votes(votes):
     """Combines the votes into a single dictionary"""
@@ -320,11 +323,51 @@ def accuracy(forest, testSet):
     correct = 0
     size = len(testSet.values)
     for x in testSet.values:
-        prediction = forestclassify(x, forest)
-        if x[-1] == prediction:
+        predictionData = forestclassify(x, forest) 
+        if predictionData[2]:
             correct+=1
+        else:
+            print("False prediction " + str(x[-1]) + " --> " 
+              + str(predictionData[1]) + " (" + str(predictionData[0]) + ")")
     return correct/size
-        
+
+def MSE(forest, testSet): # mean squared error
+    size = len(testSet.values)
+    TSE = 0 # total squared error
+    for x in testSet.values:
+        predictionData = forestclassify(x, forest) 
+        TSE += error(predictionData[0],x[-1])**2        
+    return TSE/size
+
+# Get the weighted prediction
+def exact_prediction(vote):
+    total = 0
+    for key in vote:
+        total += vote[key]
+    pred = 0
+    for key in vote:
+        pred += vote[key]/total * key
+    return pred
+
+def error(vote, actual): # calculates the error in prediction  
+    return actual - exact_prediction(vote)
+
+def correlation(x, y): #For x and y lists of numbers of equal length
+    if len(x) == len(y):
+        N = len(x)
+        sumX = 0
+        sumY = 0
+        sumXY = 0
+        sumX2 = 0
+        sumY2 = 0    
+        for n in range(0,N):
+            sumX += x[n]
+            sumY += y[n]
+            sumXY += x[n]*y[n]
+            sumX2 += x[n]*x[n]
+            sumY2 += y[n]*y[n]
+        return (N*sumXY - sumX*sumY) / sqrt((N*sumX2 - sumX**2)*(N*sumY2 - sumY**2))
+    return 0
         
 #MAIN PROGRAM
 print("running! \n")
@@ -333,8 +376,18 @@ print(data2.head())
 
 trainingset = data2.loc[0:1499] #Use first 1500 values as the trainingset
 testSet = data2.loc[1500:1599] # Use the last 100 values as the testset
-forest = buildforest(trainingset.values,targetCategories2,targetIndex2, 25) # Build a random forest of 20 trees
+forest = buildforest(trainingset.values,targetCategories2,targetIndex2, 10, 5, 50) # Build a random forest of 20 trees
 
 print("Accuracy = " + str(round(accuracy(forest,testSet),2)))
+predictionList = []
+labelList = []
+for x in testSet.values:
+    predictionList.append(exact_prediction(forestclassify(x,forest)[0]))
+    labelList.append(x[-1])
+r = correlation(predictionList,labelList)
+print("r = " + str(round(r,2)))
+print("r2 = " + str(round(r**2,2)))
+print("MSE = " + str(round(MSE(forest,testSet),2)))
+
 
 print("done!")
