@@ -7,6 +7,7 @@ Created on Wed Feb 25 2019
 @author: Samson
 """
 import pandas as pd
+
 import numpy as np
 from random import randint
 from math import sqrt
@@ -251,6 +252,7 @@ def classify(row, node):
     else:
         return classify(row, node.falseBranch)
 
+# Does exactly what it's name suggests.
 def buildforest(rows, targetCategories, targetIndex, n, depth = 10, maxSetSize = 100):
     rows0 = rows
     forest = []
@@ -287,6 +289,7 @@ def buildforest(rows, targetCategories, targetIndex, n, depth = 10, maxSetSize =
     print("forest complete!")
     return forest
 
+# Classify a row using the forest
 def forestclassify(row, forest): 
     row0 = row
     votes = []
@@ -310,6 +313,7 @@ def combine_votes(votes):
             votecounts[key] += vote[key]   
     return votecounts
 
+# what class has the most votes
 def winner(vote):
     maxKey = list(vote.keys())[0]
     maxValue = vote[maxKey]
@@ -319,22 +323,23 @@ def winner(vote):
             maxValue = vote[key]
     return maxKey
 
+# calculate the accuracy of the random forest
 def accuracy(forest, testSet):
     correct = 0
-    size = len(testSet.values)
-    for x in testSet.values:
+    size = len(testSet)
+    for x in testSet:
         predictionData = forestclassify(x, forest) 
         if predictionData[2]:
             correct+=1
         else:
-            print("False prediction " + str(x[-1]) + " --> " 
-              + str(predictionData[1]) + " (" + str(predictionData[0]) + ")")
+            print("False prediction " + str(round(x[-1],2)) + " --> " 
+              + str(round(predictionData[1],2)) + " (" + str(key_round(predictionData[0],2)) + ")")
     return correct/size
 
 def MSE(forest, testSet): # mean squared error
-    size = len(testSet.values)
+    size = len(testSet)
     TSE = 0 # total squared error
-    for x in testSet.values:
+    for x in testSet:
         predictionData = forestclassify(x, forest) 
         TSE += error(predictionData[0],x[-1])**2        
     return TSE/size
@@ -352,6 +357,7 @@ def exact_prediction(vote):
 def error(vote, actual): # calculates the error in prediction  
     return actual - exact_prediction(vote)
 
+#Calculate the correlation
 def correlation(x, y): #For x and y lists of numbers of equal length
     if len(x) == len(y):
         N = len(x)
@@ -368,26 +374,107 @@ def correlation(x, y): #For x and y lists of numbers of equal length
             sumY2 += y[n]*y[n]
         return (N*sumXY - sumX*sumY) / sqrt((N*sumX2 - sumX**2)*(N*sumY2 - sumY**2))
     return 0
-        
+
+""" Apperently I did this scaling stuff for nothing, as the Wine snob usis standardization, not min max scaling... oops"""
+# create a scaler
+def minmax_scaler(rows):
+    ranges = []
+    for i in range(0, len(rows[0])):
+        ranges.append(getInterval(rows,i)) # get the range for each row: [min,max]
+    return ranges
+
+# scale data matrix using a previously defined scaler
+def scale(rows, scaler):    
+    for row in rows:
+        for x in range(0,len(row)):
+            newvalue = (row[x] - scaler[x][0]) / (scaler[x][1] - scaler[x][0])
+            row[x] = newvalue 
+    return rows
+
+# scale the targetCategories vector using scaler            
+def scale_cat(targetCategories, targetIndex, scaler):
+    for x in range(0, len(targetCategories)):
+        newvalue = (targetCategories[x] - scaler[targetIndex][0]) / (scaler[targetIndex][1] - scaler[targetIndex][0])
+        targetCategories[x] = newvalue 
+    return targetCategories  
+
+# calculate the mean for each column
+def means(rows):
+    total = []
+    for x in rows[0]:
+        total.append(0)
+    for row in rows:
+        for x in range(0, len(row)):
+            total[x] += row[x]
+    for val in total:
+        val = val/len(rows)
+    return total
+
+# calculates standardization parameters
+def standardizer(rows):
+    means = list(np.mean(rows,0))
+    stds = list(np.std(rows,0))
+    return [means, stds]
+
+# standardizes using standardizer stdizer
+def standardize(rows, stdizer):
+    for y in range(0, len(rows)):
+        for x in range(0,len(rows[y])):
+            if not stdizer[1][x]==0:
+                rows[y][x] = (rows[y][x]-stdizer[0][x])/stdizer[1][x] # subract mean, divide by stdev            
+    return rows
+
+# standardize the targetCategories vector using stdizer           
+def stdize_cat(targetCategories, targetIndex, stdizer):
+    for x in range(0, len(targetCategories)):
+        if not stdizer[1][targetIndex]==0:
+                targetCategories[x] = (targetCategories[x]-stdizer[0][targetIndex])/stdizer[1][targetIndex] 
+                # subract mean, divide by stdev 
+    return targetCategories  
+
+# round dictionary key values:
+def key_round(dictionary,spaces):
+    new = {}    
+    for key,value in dictionary.items():
+            new[round(key,spaces)]=value
+    return new
+
 #MAIN PROGRAM
 print("running! \n")
 print("Data2 head:")
 print(data2.head())
 
-trainingset = data2.loc[0:1499] #Use first 1500 values as the trainingset
+trainingSet = data2.loc[0:1499] #Use first 1500 values as the training set
 testSet = data2.loc[1500:1599] # Use the last 100 values as the testset
-forest = buildforest(trainingset.values,targetCategories2,targetIndex2, 10, 5, 50) # Build a random forest of 20 trees
+"""
+scaler = minmax_scaler(trainingSet.values)
+sTrainingSet = scale(trainingSet.values, scaler)
+sTestSet = scale(testSet.values, scaler)
+print("sTrainingSet=" + str(sTrainingSet))
+print("sTestSet=" + str(sTestSet))
+sCat = scale_cat(targetCategories2, targetIndex2, scaler)
+print("sCat=" + str(sCat))
+"""
+stdizer = standardizer(trainingSet.values)
+sTrainingSet = standardize(trainingSet.values, stdizer)
+sTestSet = standardize(testSet.values, stdizer)
+sCat = stdize_cat(targetCategories2, targetIndex2, stdizer)
+print("sTrainingSet=" + str(sTrainingSet))
+print("sTestSet=" + str(sTestSet))
+print("sCat=" + str(sCat))
 
-print("Accuracy = " + str(round(accuracy(forest,testSet),2)))
+forest = buildforest(sTrainingSet, sCat, targetIndex2, 50, 20, 100) # Build a random forest of 20 trees
+
+print("Accuracy = " + str(round(accuracy(forest,sTestSet),2)))
 predictionList = []
 labelList = []
-for x in testSet.values:
+for x in sTestSet:
     predictionList.append(exact_prediction(forestclassify(x,forest)[0]))
     labelList.append(x[-1])
 r = correlation(predictionList,labelList)
 print("r = " + str(round(r,2)))
 print("r2 = " + str(round(r**2,2)))
-print("MSE = " + str(round(MSE(forest,testSet),2)))
+print("MSE = " + str(round(MSE(forest,sTestSet),2)))
 
 
 print("done!")
