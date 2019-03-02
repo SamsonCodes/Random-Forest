@@ -450,9 +450,9 @@ testSet = data2.loc[1500:1599] # Use the last 100 values as the testset
 scaler = minmax_scaler(trainingSet.values)
 sTrainingSet = scale(trainingSet.values, scaler)
 sTestSet = scale(testSet.values, scaler)
+sCat = scale_cat(targetCategories2, targetIndex2, scaler)
 print("sTrainingSet=" + str(sTrainingSet))
 print("sTestSet=" + str(sTestSet))
-sCat = scale_cat(targetCategories2, targetIndex2, scaler)
 print("sCat=" + str(sCat))
 """
 stdizer = standardizer(trainingSet.values)
